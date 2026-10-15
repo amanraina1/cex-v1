@@ -60,10 +60,10 @@ app.post('/order', (req: any, res: any) => {
 
     if(side === 'bid') {
         bids.push({userId, price, quantity});
-        bids.sort((a,b) => a.price < b.price ? 1: -1)
+        bids.sort((a,b) => a.price < b.price ? -1: 1)
     } else {
         asks.push({userId, price, quantity});
-        bids.sort((a,b) => a.price < b.price ? -1: 1)
+        bids.sort((a,b) => a.price < b.price ? 1: -1)
     }
 
     res.status(200).json({message: "Order partially filled", filledQuantity: quantity-remainingQuantity});
@@ -104,9 +104,52 @@ app.get('/depth', (req, res) => {
 })
 
 function fillOrders(side, price, quantity, userId): number {
+    // in this, we return 0, if quantity matches, if not then we return the remaining
+    // there are things to keep in mind here, 
+    // first, if the highest ask price is less than bid price, then its a early return as the array is sorted
+    // second, if the quantity matches or its lower than the listed one, then also swap can happen otherwise not
+    let remainingQuantity = quantity;
     if(side === "bid") {
+        for(let i=asks.length-1; i>=0; i++) {
+            if(asks[i]?.price > price) break;
 
+            if(asks[i]?.quantity >= quantity) {
+                asks[i]?.quantity -= quantity;
+                flipBalances(asks[i]?.userId, userId, remainingQuantity, asks[i]?.price);
+                return 0;
+            } else {
+                remainingQuantity -= asks[i]?.quantity;
+                flipBalances(asks[i]?.userId, userId, asks[i]?.quantity, asks[i]?.price);
+                asks.pop()
+            }
+        }
+    } else {
+        for(let i=bids.length-1; i>=0; i++) {
+            if(bids[i]?.price < price) break;
+
+            if(bids[i]?.quantity >= quantity) {
+                bids[i]?.quantity -= quantity;
+                flipBalances(bids[i]?.userId, userId, remainingQuantity, bids[i]?.price);
+                return 0;
+            } else {
+                remainingQuantity -= bids[i]?.quantity;
+                flipBalances(bids[i]?.userId, userId, bids[i]?.quantity, bids[i]?.price);
+                bids.pop()
+            }
+        }
     }
+    return remainingQuantity;
+}
+
+function flipBalances(userId1:string, userId2: string, quantity: number, price: number) {
+    let user1 = users.find(user => user.id === userId1)
+    let user2 = users.find(user => user.id === userId2)
+    if(!user1 || !user2) return;
+
+    user1.balances[TICKER] -= quantity;
+    user2.balances[TICKER] += quantity;
+    user1.balances['USD'] += (quantity * price);
+    user1.balances['USD'] -= (quantity * price); 
 }
 
 app.get('/balance/:userId', (req, res) => {
@@ -125,3 +168,5 @@ app.get('/balance/:userId', (req, res) => {
 app.listen(3001, () => {
     console.log("Listening")
 })
+
+// Reference: https://www.youtube.com/watch?v=aEMBp9Bqfwc&t=690s
