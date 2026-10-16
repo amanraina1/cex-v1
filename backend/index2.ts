@@ -161,11 +161,11 @@ function flipBalances(userId1:string, userId2: string, quantity: number, price: 
 
     if(!user1 || !user2) return;
 
-    user1.balances[TICKER] -= quantity;
-    user2.balances[TICKER] += quantity;
+    user1.balances[TICKER] += quantity;
+    user2.balances[TICKER] -= quantity;
 
-    user1.balances['USD'] -= (price*quantity);
-    user2.balances['USD'] += (price*quantity);
+    user1.balances['USD'] += (price*quantity);
+    user2.balances['USD'] -= (price*quantity);
 }
 
 app.listen(3001, () => {
